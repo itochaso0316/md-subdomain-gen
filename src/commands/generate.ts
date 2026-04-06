@@ -144,6 +144,7 @@ export async function runGenerate(url: string, opts: GenerateOptions): Promise<v
         siteType: config.site.type,
         schemaTypes: config.transform.schema_types,
         customContext: config.transform.custom_context,
+        isWpApi: useWpApi,
       });
 
       const outPath = resolveOutputPath(outputDir, page.path);

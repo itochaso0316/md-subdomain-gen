@@ -10,35 +10,82 @@ export interface SchemaBlock {
   properties: Record<string, unknown>;
 }
 
+// ── Noise Schema Types ──────────────────────────────────────────────
+
+/** Schema types that add noise without meaningful content for AI agents. */
+const NOISE_SCHEMA_TYPES = new Set([
+  'WebPage',
+  'WebSite',
+  'ImageObject',
+  'BreadcrumbList',
+  'SiteNavigationElement',
+  'WPHeader',
+  'WPFooter',
+  'WPSideBar',
+  'CollectionPage',
+  'ProfilePage',
+  'ItemPage',
+  'SearchAction',
+  'ReadAction',
+]);
+
+// ── Value Emptiness Check ───────────────────────────────────────────
+
+/**
+ * Check if a value is "empty" — null, undefined, empty string,
+ * empty array, or empty object (no own keys).
+ */
+function isEmpty(value: unknown): boolean {
+  if (value === null || value === undefined || value === '') return true;
+  if (Array.isArray(value) && value.length === 0) return true;
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    // Object with only @type or @id and no real properties
+    const meaningfulKeys = Object.keys(obj).filter((k) => !k.startsWith('@'));
+    if (meaningfulKeys.length === 0) return true;
+    // Check if all meaningful values are empty
+    if (meaningfulKeys.every((k) => isEmpty(obj[k]))) return true;
+  }
+  return false;
+}
+
 // ── Formatting Helpers ──────────────────────────────────────────────
 
 /**
  * Format a single value for inline display.
  * Handles primitives, arrays, and nested objects.
+ * Returns empty string for empty/null/undefined values.
  */
 function formatValue(value: unknown, indent: number = 0): string {
-  if (value === null || value === undefined) return '';
+  if (isEmpty(value)) return '';
 
   if (Array.isArray(value)) {
-    if (value.length === 0) return '';
+    // Filter out empty items
+    const nonEmpty = value.filter((v) => !isEmpty(v));
+    if (nonEmpty.length === 0) return '';
+
     // If array of primitives, join with comma
-    if (value.every((v) => typeof v !== 'object' || v === null)) {
-      return value.map(String).join(', ');
+    if (nonEmpty.every((v) => typeof v !== 'object' || v === null)) {
+      return nonEmpty.map(String).join(', ');
     }
     // Array of objects: render each as nested block
     const lines: string[] = [];
-    for (const item of value) {
+    for (const item of nonEmpty) {
       if (typeof item === 'object' && item !== null) {
-        lines.push(formatNestedObject(item as Record<string, unknown>, indent + 1));
+        const nested = formatNestedObject(item as Record<string, unknown>, indent + 1);
+        if (nested) lines.push(nested);
       } else {
         lines.push(`${'  '.repeat(indent + 1)}- ${String(item)}`);
       }
     }
+    if (lines.length === 0) return '';
     return '\n' + lines.join('\n');
   }
 
   if (typeof value === 'object') {
-    return '\n' + formatNestedObject(value as Record<string, unknown>, indent + 1);
+    const nested = formatNestedObject(value as Record<string, unknown>, indent + 1);
+    if (!nested) return '';
+    return '\n' + nested;
   }
 
   return String(value);
@@ -48,6 +95,7 @@ function formatValue(value: unknown, indent: number = 0): string {
  * Format a nested object as indented markdown list items.
  * Handles common Schema.org nested structures like
  * openingHoursSpecification, geo, address, etc.
+ * Skips entries where the formatted value is empty.
  */
 function formatNestedObject(obj: Record<string, unknown>, indent: number): string {
   const prefix = '  '.repeat(indent);
@@ -56,9 +104,13 @@ function formatNestedObject(obj: Record<string, unknown>, indent: number): strin
   for (const [key, val] of Object.entries(obj)) {
     // Skip JSON-LD meta keys
     if (key.startsWith('@')) continue;
-    if (val === null || val === undefined || val === '') continue;
+    // Skip empty values
+    if (isEmpty(val)) continue;
 
     const formatted = formatValue(val, indent);
+    // Skip if formatting produced empty result
+    if (!formatted) continue;
+
     if (formatted.startsWith('\n')) {
       lines.push(`${prefix}- ${key}:${formatted}`);
     } else {
@@ -67,6 +119,86 @@ function formatNestedObject(obj: Record<string, unknown>, indent: number): strin
   }
 
   return lines.join('\n');
+}
+
+// ── Schema Filtering ────────────────────────────────────────────────
+
+/**
+ * Filter schema blocks to remove noise and duplicates.
+ *
+ * - Removes noise types (WebPage, ImageObject, BreadcrumbList, etc.)
+ * - Deduplicates by type, keeping the block with more properties
+ * - For FAQPage, cleans out empty/null answers
+ */
+export function filterImportantSchemas(blocks: SchemaBlock[]): SchemaBlock[] {
+  // Remove noise types
+  let filtered = blocks.filter((b) => !NOISE_SCHEMA_TYPES.has(b.type));
+
+  // Deduplicate by type — keep the one with more non-empty properties
+  const byType = new Map<string, SchemaBlock>();
+  for (const block of filtered) {
+    const existing = byType.get(block.type);
+    if (!existing) {
+      byType.set(block.type, block);
+    } else {
+      const existingCount = Object.entries(existing.properties).filter(
+        ([k, v]) => !k.startsWith('@') && !isEmpty(v),
+      ).length;
+      const newCount = Object.entries(block.properties).filter(
+        ([k, v]) => !k.startsWith('@') && !isEmpty(v),
+      ).length;
+      if (newCount > existingCount) {
+        byType.set(block.type, block);
+      }
+    }
+  }
+
+  filtered = Array.from(byType.values());
+
+  // Merge Organization into MedicalOrganization (or other specific types)
+  // If both exist, the specific type subsumes Organization
+  const specificOrgTypes = ['MedicalOrganization', 'LocalBusiness', 'Restaurant'];
+  const hasSpecific = filtered.find((b) => specificOrgTypes.includes(b.type));
+  if (hasSpecific) {
+    const orgBlock = filtered.find((b) => b.type === 'Organization');
+    if (orgBlock) {
+      // Merge Organization properties into the specific type (don't overwrite existing)
+      for (const [key, val] of Object.entries(orgBlock.properties)) {
+        if (!(key in hasSpecific.properties) && !isEmpty(val)) {
+          hasSpecific.properties[key] = val;
+        }
+      }
+      filtered = filtered.filter((b) => b.type !== 'Organization');
+    }
+  }
+
+  // Clean FAQPage — remove entries with empty answers
+  filtered = filtered.map((block) => {
+    if (block.type === 'FAQPage' && block.properties['mainEntity']) {
+      const entities = block.properties['mainEntity'];
+      if (Array.isArray(entities)) {
+        const cleaned = entities.filter((entity) => {
+          if (typeof entity !== 'object' || entity === null) return false;
+          const e = entity as Record<string, unknown>;
+          const answer = e['acceptedAnswer'];
+          if (!answer || isEmpty(answer)) return false;
+          if (typeof answer === 'object' && answer !== null) {
+            const a = answer as Record<string, unknown>;
+            return !isEmpty(a['text']);
+          }
+          return true;
+        });
+        if (cleaned.length === 0) return null;
+        return {
+          ...block,
+          properties: { ...block.properties, mainEntity: cleaned },
+        };
+      }
+    }
+    return block;
+  }).filter((b): b is SchemaBlock => b !== null);
+
+  return filtered;
 }
 
 // ── Public API ──────────────────────────────────────────────────────
@@ -102,13 +234,15 @@ export function injectSchema(
 
 /**
  * Build a standalone schema block string without injecting it.
+ * Skips properties where the value is empty, null, undefined,
+ * empty array, or empty object.
  */
 export function buildSchemaBlock(
   schemaType: string,
   properties: Record<string, unknown>,
 ): string {
   const filteredEntries = Object.entries(properties).filter(
-    ([key, val]) => !key.startsWith('@') && val !== null && val !== undefined && val !== '',
+    ([key, val]) => !key.startsWith('@') && !isEmpty(val),
   );
 
   if (filteredEntries.length === 0) return '';
@@ -117,12 +251,18 @@ export function buildSchemaBlock(
 
   for (const [key, val] of filteredEntries) {
     const formatted = formatValue(val, 0);
+    // Skip if formatting produced empty result
+    if (!formatted) continue;
+
     if (formatted.startsWith('\n')) {
       lines.push(`- ${key}:${formatted}`);
     } else {
       lines.push(`- ${key}: ${formatted}`);
     }
   }
+
+  // If only the header line remains, skip the block
+  if (lines.length <= 1) return '';
 
   return lines.join('\n');
 }
@@ -175,12 +315,17 @@ function extractSingleBlock(item: unknown): SchemaBlock | null {
 
   const type = Array.isArray(rawType) ? rawType[0] : String(rawType);
 
-  // Collect all non-meta properties
+  // Collect all non-meta, non-empty properties
   const properties: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(obj)) {
     if (key.startsWith('@')) continue;
-    properties[key] = val;
+    if (!isEmpty(val)) {
+      properties[key] = val;
+    }
   }
+
+  // Skip blocks with no meaningful properties
+  if (Object.keys(properties).length === 0) return null;
 
   return { type: String(type), properties };
 }

@@ -124,6 +124,37 @@ async function extractViaHtml(url: string): Promise<ExtractedContent[]> {
   }
 }
 
+/**
+ * Extract JSON-LD structured data blocks from an HTML string.
+ */
+function extractJsonLdFromHtml(html: string): unknown[] {
+  const blocks: unknown[] = [];
+  const pattern = /<script\s+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(html)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      blocks.push(parsed);
+    } catch {
+      // Skip malformed JSON-LD
+    }
+  }
+  return blocks;
+}
+
+/**
+ * Fetch the homepage HTML and extract JSON-LD structured data.
+ */
+async function fetchHomepageStructuredData(siteUrl: string): Promise<unknown[]> {
+  try {
+    const response = await fetch(siteUrl);
+    const html = await response.text();
+    return extractJsonLdFromHtml(html);
+  } catch {
+    return [];
+  }
+}
+
 // ── Main Export ──────────────────────────────────────────────────────
 
 /**
@@ -175,12 +206,15 @@ export async function fetchWordPressAsPages(
   const apiBase = api.replace(/\/+$/, '');
   const origin = new URL(siteUrl).origin;
 
-  const [posts, pages] = await Promise.all([
+  const [posts, pages, homepageStructuredData] = await Promise.all([
     fetchAllPaginated<WPPost>(`${apiBase}/wp/v2/posts`),
     fetchAllPaginated<WPPage>(`${apiBase}/wp/v2/pages`),
+    fetchHomepageStructuredData(siteUrl),
   ]);
 
-  return [...pages, ...posts].map((item) => {
+  const allItems = [...pages, ...posts];
+
+  return allItems.map((item, index) => {
     const itemUrl = item.link;
     const path = new URL(itemUrl).pathname;
     const title = stripHtmlTags(item.title.rendered);
@@ -190,6 +224,10 @@ export async function fetchWordPressAsPages(
     // Wrap in minimal HTML structure for the markdown builder
     const html = `<!DOCTYPE html><html><head><title>${title}</title><meta name="description" content="${description}"></head><body><main><h1>${item.title.rendered}</h1>${contentHtml}</main></body></html>`;
 
+    // For the homepage (first page, or root path), attach structured data from HTML
+    const isHomepage = path === '/' || path === '' || index === 0;
+    const structuredData = isHomepage ? homepageStructuredData : [];
+
     return {
       url: itemUrl,
       path,
@@ -197,7 +235,7 @@ export async function fetchWordPressAsPages(
       html,
       text: stripHtmlTags(contentHtml),
       meta: { description },
-      structuredData: [],
+      structuredData,
     };
   });
 }
