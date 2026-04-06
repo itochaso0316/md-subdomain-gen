@@ -1,0 +1,51 @@
+# md-subdomain-gen default configuration
+# Copy this file as md-subdomain.config.yaml in your project root and edit.
+
+# Site basics
+site:
+  url: "https://example.com"
+  name: "My Website"
+  type: "corporate"          # medical / ecommerce / corporate / restaurant / local-business / custom
+  language: "ja"
+
+# CMS detection (set to "auto" to let the tool detect)
+cms:
+  type: "auto"               # wordpress / shopify / webflow / static / auto
+
+# Crawl settings
+crawl:
+  max_pages: 50
+  include_paths: []
+  exclude_paths:
+    - /admin/*
+    - /wp-admin/*
+    - /cart/*
+  respect_robots_txt: true
+  delay_ms: 1000
+
+# Markdown transform settings
+transform:
+  use_llm: true
+  llm_model: "claude-sonnet-4-20250514"
+  schema_types: []
+  custom_context: ""
+
+# Deploy settings
+deploy:
+  platform: "cloudflare"     # cloudflare / github-pages / netlify / vercel
+  subdomain: "md"
+  cloudflare:
+    account_id: ""
+    zone_id: ""
+    route: ""
+
+# Sync settings
+sync:
+  mode: "manual"             # webhook / polling / manual
+  polling_interval: "6h"
+  webhook_secret: ""
+
+# Output settings
+output:
+  dir: "./md-output"
+  url_structure: "mirror"    # mirror / flat

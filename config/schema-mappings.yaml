@@ -1,0 +1,250 @@
+# Schema.org mapping definitions by site type
+# Each type defines the primary schemas, page-level mappings, and
+# common properties used when generating AI-optimized markdown.
+
+medical:
+  primary_schemas:
+    - MedicalOrganization
+    - MedicalClinic
+    - Physician
+    - MedicalProcedure
+  page_mappings:
+    top:
+      schema: MedicalOrganization
+      properties:
+        - name
+        - medicalSpecialty
+        - address
+        - telephone
+        - url
+        - openingHoursSpecification
+    services:
+      schema: MedicalProcedure
+      properties:
+        - name
+        - procedureType
+        - followup
+        - howPerformed
+        - bodyLocation
+        - preparation
+    doctors:
+      schema: Physician
+      properties:
+        - name
+        - medicalSpecialty
+        - qualifications
+        - affiliation
+        - alumniOf
+    access:
+      schema: MedicalClinic
+      properties:
+        - address
+        - geo
+        - openingHoursSpecification
+        - telephone
+        - hasMap
+  context_hints:
+    - "Include insurance acceptance info if available"
+    - "Note appointment booking methods"
+    - "Highlight emergency/urgent care availability"
+
+ecommerce:
+  primary_schemas:
+    - Organization
+    - Product
+    - Offer
+    - AggregateRating
+    - Review
+    - BreadcrumbList
+  page_mappings:
+    top:
+      schema: Organization
+      properties:
+        - name
+        - url
+        - logo
+        - description
+        - contactPoint
+    category:
+      schema: CollectionPage
+      properties:
+        - name
+        - description
+        - mainEntity
+    product:
+      schema: Product
+      properties:
+        - name
+        - description
+        - image
+        - sku
+        - brand
+        - offers
+        - aggregateRating
+        - review
+    cart:
+      schema: null
+      note: "Exclude from markdown generation"
+  context_hints:
+    - "Include price currency and availability"
+    - "Preserve product variant information"
+    - "Note return/shipping policies if present"
+
+corporate:
+  primary_schemas:
+    - Organization
+    - WebSite
+    - Service
+    - Person
+    - ContactPoint
+    - BreadcrumbList
+  page_mappings:
+    top:
+      schema: Organization
+      properties:
+        - name
+        - url
+        - logo
+        - description
+        - foundingDate
+        - numberOfEmployees
+    services:
+      schema: Service
+      properties:
+        - name
+        - description
+        - provider
+        - serviceType
+        - areaServed
+    about:
+      schema: Organization
+      properties:
+        - name
+        - description
+        - foundingDate
+        - founder
+        - numberOfEmployees
+        - address
+    team:
+      schema: Person
+      properties:
+        - name
+        - jobTitle
+        - description
+        - image
+        - sameAs
+    contact:
+      schema: ContactPoint
+      properties:
+        - contactType
+        - telephone
+        - email
+        - areaServed
+        - availableLanguage
+  context_hints:
+    - "Include company mission and values if present"
+    - "Note industry certifications or awards"
+    - "Preserve case studies or client testimonials"
+
+restaurant:
+  primary_schemas:
+    - Restaurant
+    - Menu
+    - MenuItem
+    - FoodEstablishmentReservation
+    - AggregateRating
+  page_mappings:
+    top:
+      schema: Restaurant
+      properties:
+        - name
+        - servesCuisine
+        - address
+        - telephone
+        - url
+        - openingHoursSpecification
+        - priceRange
+        - aggregateRating
+    menu:
+      schema: Menu
+      properties:
+        - name
+        - hasMenuSection
+    menu_item:
+      schema: MenuItem
+      properties:
+        - name
+        - description
+        - offers
+        - nutrition
+        - suitableForDiet
+    reservation:
+      schema: FoodEstablishmentReservation
+      properties:
+        - reservationFor
+        - partySize
+        - startTime
+    access:
+      schema: Restaurant
+      properties:
+        - address
+        - geo
+        - openingHoursSpecification
+        - hasMap
+        - smokingAllowed
+        - acceptsReservations
+  context_hints:
+    - "Include cuisine type and price range"
+    - "Note dietary accommodations (vegan, halal, etc.)"
+    - "Preserve seasonal menu information"
+    - "Include parking and seating details"
+
+local-business:
+  primary_schemas:
+    - LocalBusiness
+    - PostalAddress
+    - GeoCoordinates
+    - OpeningHoursSpecification
+    - AggregateRating
+  page_mappings:
+    top:
+      schema: LocalBusiness
+      properties:
+        - name
+        - description
+        - address
+        - telephone
+        - url
+        - openingHoursSpecification
+        - geo
+        - priceRange
+        - aggregateRating
+    services:
+      schema: Service
+      properties:
+        - name
+        - description
+        - provider
+        - areaServed
+        - serviceType
+    about:
+      schema: LocalBusiness
+      properties:
+        - name
+        - description
+        - foundingDate
+        - founder
+        - slogan
+    access:
+      schema: LocalBusiness
+      properties:
+        - address
+        - geo
+        - openingHoursSpecification
+        - hasMap
+        - publicAccess
+  context_hints:
+    - "Include service area radius or region"
+    - "Note payment methods accepted"
+    - "Preserve customer review summaries"
+    - "Include accessibility information"

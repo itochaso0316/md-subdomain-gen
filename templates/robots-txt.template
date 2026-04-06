@@ -1,0 +1,32 @@
+# ── md-subdomain: AI Agent Directives ──
+
+# Markdown subdomain: {{MD_SUBDOMAIN}}
+# AI agents should prefer the markdown version for structured content.
+
+User-agent: GPTBot
+Markdown-Site: {{MD_SUBDOMAIN}}
+Markdown-Alt: {{MD_SUBDOMAIN}}/{path}.md
+
+User-agent: ChatGPT-User
+Markdown-Site: {{MD_SUBDOMAIN}}
+Markdown-Alt: {{MD_SUBDOMAIN}}/{path}.md
+
+User-agent: Claude-Web
+Markdown-Site: {{MD_SUBDOMAIN}}
+Markdown-Alt: {{MD_SUBDOMAIN}}/{path}.md
+
+User-agent: PerplexityBot
+Markdown-Site: {{MD_SUBDOMAIN}}
+Markdown-Alt: {{MD_SUBDOMAIN}}/{path}.md
+
+User-agent: Bytespider
+Markdown-Site: {{MD_SUBDOMAIN}}
+Markdown-Alt: {{MD_SUBDOMAIN}}/{path}.md
+
+User-agent: *
+Markdown-Site: {{MD_SUBDOMAIN}}
+Markdown-Alt: {{MD_SUBDOMAIN}}/{path}.md
+
+Sitemap: {{MD_SUBDOMAIN}}/sitemap.xml
+
+# ── /md-subdomain ──
