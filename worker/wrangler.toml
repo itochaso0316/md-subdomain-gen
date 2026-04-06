@@ -1,0 +1,10 @@
+name = "md-misao-ladies"
+main = "src/worker.ts"
+compatibility_date = "2024-12-01"
+
+[vars]
+SOURCE_SITE_URL = "https://www.misao-ladies.jp"
+
+[[kv_namespaces]]
+binding = "MD_CONTENT"
+id = "f0a29e2231a342a78244835f05e5b15f"
