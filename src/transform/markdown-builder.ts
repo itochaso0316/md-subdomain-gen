@@ -147,6 +147,9 @@ function cleanMarkdown(md: string): string {
   // ── Remove "詳しく見る" / "すべて見る" link-only lines ──────────
   cleaned = cleaned.replace(/^\[[\*]*(?:詳しく見る|すべて見る|コラム一覧を見る)[\*]*\]\([^\)]*\)\s*$/gm, '');
 
+  // ── Remove trailing backslash line breaks (noise for AI) ──────────
+  cleaned = cleaned.replace(/\\\s*$/gm, '');
+
   // ── Remove trailing ** from headings (e.g. "### Question?**") ─────
   cleaned = cleaned.replace(/^(#{1,6}\s+.*?)\*\*\s*$/gm, '$1');
 

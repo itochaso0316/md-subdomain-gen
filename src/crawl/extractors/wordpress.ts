@@ -155,6 +155,43 @@ async function fetchHomepageStructuredData(siteUrl: string): Promise<unknown[]> 
   }
 }
 
+/**
+ * Clean WordPress content.rendered HTML before markdown conversion.
+ * Strips classes, styles, data-* attrs, divs/spans wrappers, shortcodes, etc.
+ */
+function cleanWpContentHtml(html: string): string {
+  let cleaned = html;
+
+  // Remove ALL HTML comments (including multiline)
+  cleaned = cleaned.replace(/<!--[\s\S]*?-->/g, '');
+
+  // Remove inline style attributes
+  cleaned = cleaned.replace(/\s*style="[^"]*"/gi, '');
+  cleaned = cleaned.replace(/\s*style='[^']*'/gi, '');
+
+  // Remove class attributes
+  cleaned = cleaned.replace(/\s*class="[^"]*"/gi, '');
+  cleaned = cleaned.replace(/\s*class='[^']*'/gi, '');
+
+  // Remove data-* attributes
+  cleaned = cleaned.replace(/\s*data-[\w-]+="[^"]*"/gi, '');
+  cleaned = cleaned.replace(/\s*data-[\w-]+='[^']*'/gi, '');
+
+  // Flatten <div> and </div> tags (keep content)
+  cleaned = cleaned.replace(/<\/?div[^>]*>/gi, '');
+
+  // Flatten <span> and </span> tags (keep content)
+  cleaned = cleaned.replace(/<\/?span[^>]*>/gi, '');
+
+  // Remove empty <p></p> tags
+  cleaned = cleaned.replace(/<p>\s*<\/p>/gi, '');
+
+  // Remove WordPress shortcode remnants (e.g. [vc_column], [/vc_column], [vc_row], etc.)
+  cleaned = cleaned.replace(/\[\/?[a-z_]+(?:\s[^\]]*)?\]/gi, '');
+
+  return cleaned;
+}
+
 // ── Main Export ──────────────────────────────────────────────────────
 
 /**
@@ -219,7 +256,7 @@ export async function fetchWordPressAsPages(
     const path = new URL(itemUrl).pathname;
     const title = stripHtmlTags(item.title.rendered);
     const description = stripHtmlTags(item.excerpt.rendered);
-    const contentHtml = item.content.rendered;
+    const contentHtml = cleanWpContentHtml(item.content.rendered);
 
     // Wrap in minimal HTML structure for the markdown builder
     const html = `<!DOCTYPE html><html><head><title>${title}</title><meta name="description" content="${description}"></head><body><main><h1>${item.title.rendered}</h1>${contentHtml}</main></body></html>`;

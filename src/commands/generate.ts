@@ -11,12 +11,14 @@ import { detectCMS } from '../crawl/detector.js';
 import { crawlSite, type PageContent } from '../crawl/crawler.js';
 import { fetchWordPressAsPages } from '../crawl/extractors/wordpress.js';
 import { buildMarkdown } from '../transform/markdown-builder.js';
+import { optimizeContent } from '../transform/llm-optimizer.js';
 import { countTokens } from '../validate/token-counter.js';
 
 export interface GenerateOptions {
   pages?: string[];
   output?: string;
   wpApi?: boolean;
+  optimize?: boolean;
 }
 
 /**
@@ -133,19 +135,35 @@ export async function runGenerate(url: string, opts: GenerateOptions): Promise<v
   }
 
   // ── Transform & Write ─────────────────────────────────────────────
-  const transformSpinner = ora('Generating markdown...').start();
+  const useLlm = opts.optimize !== false && config.transform.use_llm && !!process.env['ANTHROPIC_API_KEY'];
+  const transformSpinner = ora(useLlm ? 'Generating & optimizing markdown with Claude...' : 'Generating markdown...').start();
   let totalHtmlTokens = 0;
   let totalMdTokens = 0;
   let written = 0;
 
   try {
     for (const page of pages) {
-      const markdown = await buildMarkdown(page, {
+      let markdown = await buildMarkdown(page, {
         siteType: config.site.type,
         schemaTypes: config.transform.schema_types,
         customContext: config.transform.custom_context,
         isWpApi: useWpApi,
       });
+
+      // LLM optimization: compress content and add natural language context
+      if (useLlm) {
+        try {
+          markdown = await optimizeContent(markdown, {
+            siteType: config.site.type,
+            customContext: config.transform.custom_context,
+            language: config.site.language,
+          }, { model: config.transform.llm_model });
+        } catch (llmErr) {
+          // If LLM fails, continue with unoptimized markdown
+          const errMsg = llmErr instanceof Error ? llmErr.message : String(llmErr);
+          transformSpinner.text = `LLM error on ${page.path}: ${errMsg.slice(0, 80)}`;
+        }
+      }
 
       const outPath = resolveOutputPath(outputDir, page.path);
       await mkdir(dirname(outPath), { recursive: true });
@@ -155,10 +173,10 @@ export async function runGenerate(url: string, opts: GenerateOptions): Promise<v
       totalMdTokens += countTokens(markdown);
       written++;
 
-      transformSpinner.text = `Generating markdown... (${written}/${pages.length})`;
+      transformSpinner.text = `${useLlm ? 'Optimizing' : 'Generating'} markdown... (${written}/${pages.length})`;
     }
 
-    transformSpinner.succeed(`Generated ${chalk.cyan(String(written))} markdown file(s)`);
+    transformSpinner.succeed(`Generated ${chalk.cyan(String(written))} markdown file(s)${useLlm ? ' (Claude optimized)' : ''}`);
   } catch (err) {
     transformSpinner.fail('Markdown generation failed');
     console.error(chalk.red(`  ${(err as Error).message}`));

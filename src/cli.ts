@@ -29,10 +29,11 @@ program
   .option('-p, --pages <paths>', 'Comma-separated page paths to generate (e.g. /,/about,/services)')
   .option('-o, --output <dir>', 'Output directory (default: ./md-output)')
   .option('--no-wp-api', 'Disable WordPress REST API mode (use HTML crawling instead)')
-  .action(async (url: string, opts: { pages?: string; output?: string; wpApi?: boolean }) => {
+  .option('--no-optimize', 'Disable Claude API optimization')
+  .action(async (url: string, opts: { pages?: string; output?: string; wpApi?: boolean; optimize?: boolean }) => {
     const pages = opts.pages?.split(',').map((p) => p.trim());
     const { runGenerate } = await import('./commands/generate.js');
-    await runGenerate(url, { pages, output: opts.output, wpApi: opts.wpApi });
+    await runGenerate(url, { pages, output: opts.output, wpApi: opts.wpApi, optimize: opts.optimize });
   });
 
 // ── validate ──────────────────────────────────────────────────────────
