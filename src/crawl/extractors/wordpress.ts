@@ -1,4 +1,5 @@
 import { extractStatic, type ExtractedContent } from './static.js';
+import type { PageContent } from '../crawler.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -157,4 +158,46 @@ export async function extractWordPress(
 
   // Fallback to HTML extraction
   return extractViaHtml(url);
+}
+
+/**
+ * Fetch all pages and posts as PageContent[] via WP REST API.
+ * This provides cleaner content than HTML crawling since WP returns
+ * rendered content blocks without navigation/footer chrome.
+ */
+export async function fetchWordPressAsPages(
+  siteUrl: string,
+  apiEndpoint?: string,
+): Promise<PageContent[]> {
+  const api = apiEndpoint ?? (await discoverApiEndpoint(siteUrl));
+  if (!api) return [];
+
+  const apiBase = api.replace(/\/+$/, '');
+  const origin = new URL(siteUrl).origin;
+
+  const [posts, pages] = await Promise.all([
+    fetchAllPaginated<WPPost>(`${apiBase}/wp/v2/posts`),
+    fetchAllPaginated<WPPage>(`${apiBase}/wp/v2/pages`),
+  ]);
+
+  return [...pages, ...posts].map((item) => {
+    const itemUrl = item.link;
+    const path = new URL(itemUrl).pathname;
+    const title = stripHtmlTags(item.title.rendered);
+    const description = stripHtmlTags(item.excerpt.rendered);
+    const contentHtml = item.content.rendered;
+
+    // Wrap in minimal HTML structure for the markdown builder
+    const html = `<!DOCTYPE html><html><head><title>${title}</title><meta name="description" content="${description}"></head><body><main><h1>${item.title.rendered}</h1>${contentHtml}</main></body></html>`;
+
+    return {
+      url: itemUrl,
+      path,
+      title,
+      html,
+      text: stripHtmlTags(contentHtml),
+      meta: { description },
+      structuredData: [],
+    };
+  });
 }

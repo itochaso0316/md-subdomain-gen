@@ -9,12 +9,14 @@ import ora from 'ora';
 import { loadConfig, createDefaultConfig, type MdSubdomainConfig } from '../config.js';
 import { detectCMS } from '../crawl/detector.js';
 import { crawlSite, type PageContent } from '../crawl/crawler.js';
+import { fetchWordPressAsPages } from '../crawl/extractors/wordpress.js';
 import { buildMarkdown } from '../transform/markdown-builder.js';
 import { countTokens } from '../validate/token-counter.js';
 
 export interface GenerateOptions {
   pages?: string[];
   output?: string;
+  wpApi?: boolean;
 }
 
 /**
@@ -67,20 +69,57 @@ export async function runGenerate(url: string, opts: GenerateOptions): Promise<v
   }
 
   // ── Crawl ─────────────────────────────────────────────────────────
-  const crawlSpinner = ora('Crawling site...').start();
+  const useWpApi = opts.wpApi !== false && cmsType === 'wordpress';
+  const crawlSpinner = ora(useWpApi ? 'Fetching via WP REST API...' : 'Crawling site...').start();
   let pages: PageContent[];
   try {
-    const includePaths = opts.pages ?? config.crawl.include_paths;
-    pages = await crawlSite({
-      url,
-      cms: cmsType as 'wordpress' | 'shopify' | 'webflow' | 'static',
-      max_pages: config.crawl.max_pages,
-      include_paths: includePaths,
-      exclude_paths: config.crawl.exclude_paths,
-      respect_robots_txt: config.crawl.respect_robots_txt,
-      delay_ms: config.crawl.delay_ms,
-    });
-    crawlSpinner.succeed(`Crawled ${chalk.cyan(String(pages.length))} page(s)`);
+    if (useWpApi) {
+      // WordPress REST API mode — cleaner content, no nav/footer chrome
+      const apiEndpoint = config.cms.api_endpoint || undefined;
+      pages = await fetchWordPressAsPages(url, apiEndpoint);
+
+      // Apply include/exclude path filters
+      const includePaths = opts.pages ?? config.crawl.include_paths;
+      if (includePaths.length > 0) {
+        pages = pages.filter((p) =>
+          includePaths.some((pattern) => {
+            if (pattern.endsWith('*')) {
+              return p.path.startsWith(pattern.slice(0, -1));
+            }
+            return p.path === pattern || p.path === pattern + '/';
+          }),
+        );
+      }
+      if (config.crawl.exclude_paths.length > 0) {
+        pages = pages.filter((p) =>
+          !config.crawl.exclude_paths.some((pattern) => {
+            if (pattern.endsWith('*')) {
+              return p.path.startsWith(pattern.slice(0, -1));
+            }
+            return p.path === pattern || p.path === pattern + '/';
+          }),
+        );
+      }
+
+      // Respect max_pages
+      if (pages.length > config.crawl.max_pages) {
+        pages = pages.slice(0, config.crawl.max_pages);
+      }
+
+      crawlSpinner.succeed(`Fetched ${chalk.cyan(String(pages.length))} page(s) via WP REST API`);
+    } else {
+      const includePaths = opts.pages ?? config.crawl.include_paths;
+      pages = await crawlSite({
+        url,
+        cms: cmsType as 'wordpress' | 'shopify' | 'webflow' | 'static',
+        max_pages: config.crawl.max_pages,
+        include_paths: includePaths,
+        exclude_paths: config.crawl.exclude_paths,
+        respect_robots_txt: config.crawl.respect_robots_txt,
+        delay_ms: config.crawl.delay_ms,
+      });
+      crawlSpinner.succeed(`Crawled ${chalk.cyan(String(pages.length))} page(s)`);
+    }
   } catch (err) {
     crawlSpinner.fail('Crawl failed');
     console.error(chalk.red(`  ${(err as Error).message}`));
