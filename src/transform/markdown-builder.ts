@@ -6,6 +6,7 @@
 import { unified } from 'unified';
 import rehypeParse from 'rehype-parse';
 import rehypeRemark from 'rehype-remark';
+import remarkGfm from 'remark-gfm';
 import remarkStringify from 'remark-stringify';
 import type { PageContent } from '../crawl/crawler.js';
 import type { SiteConfig } from '../config.js';
@@ -33,6 +34,7 @@ export interface TransformOptions {
 const htmlToMarkdown = unified()
   .use(rehypeParse, { fragment: false })
   .use(rehypeRemark)
+  .use(remarkGfm)
   .use(remarkStringify);
 
 /**

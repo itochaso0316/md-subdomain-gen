@@ -200,6 +200,7 @@ export async function crawlSite(config: CrawlSiteConfig): Promise<PageContent[]>
   try {
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({
+      ignoreHTTPSErrors: true,
       userAgent:
         'Mozilla/5.0 (compatible; md-subdomain-gen/0.1; +https://github.com/user/md-subdomain-gen)',
     });

@@ -27,19 +27,11 @@ program
   .command('generate <url>')
   .description('Generate AI-optimized markdown from a website')
   .option('-p, --pages <paths>', 'Comma-separated page paths to generate (e.g. /,/about,/services)')
-  .action(async (url: string, opts: { pages?: string }) => {
+  .option('-o, --output <dir>', 'Output directory (default: ./md-output)')
+  .action(async (url: string, opts: { pages?: string; output?: string }) => {
     const pages = opts.pages?.split(',').map((p) => p.trim());
-    const { loadConfig } = await import('./config.js');
-    const config = await loadConfig();
-
-    console.log(`Generating markdown for ${url}`);
-    if (pages) {
-      console.log(`  Pages: ${pages.join(', ')}`);
-    }
-    console.log(`  Output: ${config.output.dir}`);
-
-    // TODO: wire up crawl -> transform -> validate pipeline
-    console.log('Generation pipeline not yet implemented.');
+    const { runGenerate } = await import('./commands/generate.js');
+    await runGenerate(url, { pages, output: opts.output });
   });
 
 // ── validate ──────────────────────────────────────────────────────────
@@ -47,10 +39,8 @@ program
   .command('validate <dir>')
   .description('Validate generated markdown files')
   .action(async (dir: string) => {
-    console.log(`Validating markdown in ${dir}`);
-
-    // TODO: wire up schema-validator, token-counter, accuracy-checker
-    console.log('Validation not yet implemented.');
+    const { runValidate } = await import('./commands/validate.js');
+    await runValidate(dir);
   });
 
 // ── deploy ────────────────────────────────────────────────────────────
@@ -95,10 +85,8 @@ program
   .command('report <url>')
   .description('Generate token comparison report (HTML vs optimized markdown)')
   .action(async (url: string) => {
-    console.log(`Generating token comparison report for ${url}`);
-
-    // TODO: wire up token-counter and report generator
-    console.log('Report not yet implemented.');
+    const { runReport } = await import('./commands/report.js');
+    await runReport(url);
   });
 
 program.parse();
